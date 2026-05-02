@@ -6,7 +6,11 @@ import {
   Copy, 
   Loader2, 
   Check,
-  Printer
+  Printer,
+  ChevronLeft,
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast, Toaster } from "sonner";
@@ -21,6 +25,12 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { 
+  Tooltip, 
+  TooltipContent, 
+  TooltipProvider, 
+  TooltipTrigger 
+} from "@/components/ui/tooltip";
 
 import { generateCopy, CopyInput } from "@/src/lib/gemini";
 import { COPY_STRATEGIES, MENTAL_TRIGGERS } from "@/src/lib/templates";
@@ -30,6 +40,18 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [generatedCopy, setGeneratedCopy] = useState<string>("");
   const [history, setHistory] = useState<string[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Handle window resizing
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Load history from Supabase on mount
   useEffect(() => {
@@ -124,7 +146,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-neutral-300 font-sans flex flex-col selection:bg-amber-500/30 selection:text-amber-200 normal-case" id="app-container">
+    <TooltipProvider>
+      <div className="min-h-screen bg-[#0A0A0B] text-neutral-300 font-sans flex flex-col selection:bg-amber-500/30 selection:text-amber-200 normal-case" id="app-container">
       <Toaster position="top-center" theme="dark" richColors />
       
       {/* Header */}
@@ -158,140 +181,291 @@ export default function App() {
       <main className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden bg-[#0D0D0F]">
         
         {/* Sidebar - Left (Inputs) */}
-        <aside className="w-full lg:w-[480px] lg:border-r border-white/5 bg-[#0D0D0F] p-8 lg:p-14 flex flex-col gap-10 overflow-y-auto custom-scrollbar shrink-0">
-            <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full mb-2">
-              <div className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-              <span className="text-[10px] uppercase tracking-widest text-amber-400 font-bold">Copy Architect v3</span>
-            </div>
-            <h2 className="text-3xl font-serif text-white tracking-tight">Engenharia de <span className="text-neutral-600">Alta Conversão</span></h2>
-          </div>
-
-          <div className="space-y-8">
-            <div className="space-y-3">
-              <Label htmlFor="productName" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Ativo / Oferta *</Label>
-              <Input 
-                id="productName" 
-                className="bg-[#141416] border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 font-medium text-base shadow-inner"
-                placeholder="Ex: Método Flow Profissional" 
-                value={formData.productName}
-                onChange={(e) => setFormData({...formData, productName: e.target.value})}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <Label htmlFor="niche" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Nicho</Label>
-                <Input 
-                  id="niche" 
-                  className="bg-[#141416] border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800"
-                  placeholder="Ex: Fitness" 
-                  value={formData.niche}
-                  onChange={(e) => setFormData({...formData, niche: e.target.value})}
-                />
+        <AnimatePresence mode="popLayout" initial={false}>
+          {isSidebarOpen && (
+            <motion.aside 
+              initial={{ width: 0, opacity: 0, x: -50 }}
+              animate={{ 
+                width: isMobile ? "100%" : 480, 
+                opacity: 1, 
+                x: 0 
+              }}
+              exit={{ width: 0, opacity: 0, x: -50 }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="w-full lg:w-[480px] lg:border-r border-white/5 bg-[#0D0D0F] p-8 lg:p-14 flex flex-col gap-10 overflow-y-auto custom-scrollbar shrink-0"
+            >
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full mb-2">
+                  <div className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+                  <span className="text-[10px] uppercase tracking-widest text-amber-400 font-bold">Copy Architect v3</span>
+                </div>
+                <h2 className="text-3xl font-serif text-white tracking-tight">Engenharia de <span className="text-neutral-600">Alta Conversão</span></h2>
               </div>
-              <div className="space-y-3">
-                <Label htmlFor="targetAudience" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Público</Label>
-                <Input 
-                  id="targetAudience" 
-                  className="bg-[#141416] border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800"
-                  placeholder="Ex: Iniciantes" 
-                  value={formData.targetAudience}
-                  onChange={(e) => setFormData({...formData, targetAudience: e.target.value})}
-                />
-              </div>
-            </div>
 
-            <div className="space-y-3">
-              <Label htmlFor="mainBenefit" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Promessa Central *</Label>
-              <Input 
-                id="mainBenefit" 
-                className="bg-[#141416] border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 font-medium text-base"
-                placeholder="Ex: Venda sem investir 1 real" 
-                value={formData.mainBenefit}
-                onChange={(e) => setFormData({...formData, mainBenefit: e.target.value})}
-              />
-            </div>
+              <div className="space-y-8">
+                {/* Ativo / Oferta */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="productName" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Ativo / Oferta *</Label>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <div className="w-4 h-4 rounded-full border border-white/10 flex items-center justify-center cursor-help transition-colors hover:border-amber-500/50">
+                          <span className="text-[8px] font-bold text-neutral-600">?</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-[#1A1A1C] border-white/10 text-neutral-300 max-w-[200px]">
+                        <p>O nome do seu curso, produto, serviço ou oferta principal.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Input 
+                    id="productName" 
+                    className="bg-[#141416]/50 border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 font-medium text-base shadow-inner hover:bg-[#141416] border"
+                    placeholder="Ex: Método Flow Profissional" 
+                    value={formData.productName}
+                    onChange={(e) => setFormData({...formData, productName: e.target.value})}
+                  />
+                </div>
 
-            <div className="space-y-3">
-              <Label htmlFor="mainPain" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Problema Crítico *</Label>
-              <Input 
-                id="mainPain" 
-                className="bg-[#141416] border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 font-medium text-base"
-                placeholder="Ex: Bloqueios constants no Facebook" 
-                value={formData.mainPain}
-                onChange={(e) => setFormData({...formData, mainPain: e.target.value})}
-              />
-            </div>
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Nicho */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="niche" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Nicho</Label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <div className="w-4 h-4 rounded-full border border-white/10 flex items-center justify-center cursor-help transition-colors hover:border-amber-500/50">
+                            <span className="text-[8px] font-bold text-neutral-600">?</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-[#1A1A1C] border-white/10 text-neutral-300 max-w-[200px]">
+                          <p>A área de atuação (ex: Finanças, Emagrecimento, Marketing).</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Input 
+                      id="niche" 
+                      className="bg-[#141416]/50 border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 hover:bg-[#141416] border"
+                      placeholder="Ex: Fitness" 
+                      value={formData.niche}
+                      onChange={(e) => setFormData({...formData, niche: e.target.value})}
+                    />
+                  </div>
+                  {/* Público */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="targetAudience" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Público</Label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <div className="w-4 h-4 rounded-full border border-white/10 flex items-center justify-center cursor-help transition-colors hover:border-amber-500/50">
+                            <span className="text-[8px] font-bold text-neutral-600">?</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-[#1A1A1C] border-white/10 text-neutral-300 max-w-[200px]">
+                          <p>Quem é o seu avatar ideal? (ex: Mulheres 40+, Pequenos empresários).</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Input 
+                      id="targetAudience" 
+                      className="bg-[#141416]/50 border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 hover:bg-[#141416] border"
+                      placeholder="Ex: Iniciantes" 
+                      value={formData.targetAudience}
+                      onChange={(e) => setFormData({...formData, targetAudience: e.target.value})}
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-3">
-              <Label htmlFor="keywords" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Palavras de Impacto</Label>
-              <Input 
-                id="keywords" 
-                className="bg-[#141416] border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800"
-                placeholder="Ex: bizarro, hack, revelado" 
-                value={formData.keywords}
-                onChange={(e) => setFormData({...formData, keywords: e.target.value})}
-              />
-            </div>
+                {/* Promessa Central */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="mainBenefit" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Promessa Central *</Label>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <div className="w-4 h-4 rounded-full border border-white/10 flex items-center justify-center cursor-help transition-colors hover:border-amber-500/50">
+                          <span className="text-[8px] font-bold text-neutral-600">?</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-[#1A1A1C] border-white/10 text-neutral-300 max-w-[200px]">
+                        <p>O maior benefício que o cliente terá ao adquirir sua oferta.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Input 
+                    id="mainBenefit" 
+                    className="bg-[#141416]/50 border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 font-medium text-base hover:bg-[#141416] border"
+                    placeholder="Ex: Venda sem investir 1 real" 
+                    value={formData.mainBenefit}
+                    onChange={(e) => setFormData({...formData, mainBenefit: e.target.value})}
+                  />
+                </div>
 
-            <div className="space-y-3">
-              <Label className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Modelo de Escrita</Label>
-              <Select 
-                value={formData.strategyId} 
-                onValueChange={(val) => setFormData({...formData, strategyId: val})}
-              >
-                <SelectTrigger className="w-full bg-[#141416] border-white/5 rounded-2xl h-14 px-6 text-neutral-200 focus:ring-amber-500/20 transition-all text-left font-medium">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1A1A1C] border-white/10 text-neutral-200">
-                  {COPY_STRATEGIES.map((s) => (
-                    <SelectItem key={s.id} value={s.id} className="focus:bg-amber-500/10 focus:text-amber-400 cursor-pointer py-3 rounded-lg mx-2 my-1">
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                {/* Problema Crítico */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="mainPain" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Problema Crítico *</Label>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <div className="w-4 h-4 rounded-full border border-white/10 flex items-center justify-center cursor-help transition-colors hover:border-amber-500/50">
+                          <span className="text-[8px] font-bold text-neutral-600">?</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-[#1A1A1C] border-white/10 text-neutral-300 max-w-[200px]">
+                        <p>A maior dor ou frustração que seu público enfrenta hoje.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Input 
+                    id="mainPain" 
+                    className="bg-[#141416]/50 border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 font-medium text-base hover:bg-[#141416] border"
+                    placeholder="Ex: Bloqueios constants no Facebook" 
+                    value={formData.mainPain}
+                    onChange={(e) => setFormData({...formData, mainPain: e.target.value})}
+                  />
+                </div>
 
-            <div className="space-y-3">
-              <Label className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Gatilho Primário</Label>
-              <Select 
-                value={formData.mentalTrigger} 
-                onValueChange={(val) => setFormData({...formData, mentalTrigger: val})}
-              >
-                <SelectTrigger className="w-full bg-[#141416] border-white/5 rounded-2xl h-14 px-6 text-neutral-200 focus:ring-amber-500/20 transition-all text-left font-medium">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1A1A1C] border-white/10 text-neutral-200">
-                  {MENTAL_TRIGGERS.map((trigger) => (
-                    <SelectItem key={trigger} value={trigger} className="focus:bg-amber-500/10 focus:text-amber-400 cursor-pointer py-3 rounded-lg mx-2 my-1 text-left">
-                      {trigger}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                {/* Palavras de Impacto */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="keywords" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Palavras de Impacto</Label>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <div className="w-4 h-4 rounded-full border border-white/10 flex items-center justify-center cursor-help transition-colors hover:border-amber-500/50">
+                          <span className="text-[8px] font-bold text-neutral-600">?</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-[#1A1A1C] border-white/10 text-neutral-300 max-w-[200px]">
+                        <p>Palavras que geram curiosidade ou autoridade.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Input 
+                    id="keywords" 
+                    className="bg-[#141416]/50 border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 hover:bg-[#141416] border"
+                    placeholder="Ex: bizarro, hack, revelado" 
+                    value={formData.keywords}
+                    onChange={(e) => setFormData({...formData, keywords: e.target.value})}
+                  />
+                </div>
 
-            <div className="pt-8">
-              <Button 
-                className="w-full h-16 bg-gradient-to-r from-amber-600 to-amber-400 hover:from-amber-500 hover:to-amber-300 text-black font-black uppercase tracking-[0.1em] sm:tracking-[0.2em] text-[12px] shadow-2xl shadow-amber-600/30 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] border-none px-4" 
-                id="generate-btn"
-                onClick={handleGenerate}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-3 animate-spin" />
-                    <span>Engenhando...</span>
-                  </>
-                ) : (
-                  <span className="truncate">Gerar Copy de Alta Performance</span>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Modelo de Escrita</Label>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <div className="w-4 h-4 rounded-full border border-white/10 flex items-center justify-center cursor-help transition-colors hover:border-amber-500/50">
+                          <span className="text-[8px] font-bold text-neutral-600">?</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-[#1A1A1C] border-white/10 text-neutral-300 max-w-[200px]">
+                        <p>Diferentes abordagens de copy para diferentes objetivos e canais.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Select 
+                    value={formData.strategyId} 
+                    onValueChange={(val) => setFormData({...formData, strategyId: val})}
+                  >
+                    <SelectTrigger className="w-full bg-[#141416]/50 border-white/5 rounded-2xl h-14 px-6 text-neutral-200 focus:ring-amber-500/20 transition-all text-left font-medium hover:bg-[#141416] border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#1A1A1C] border-white/10 text-neutral-200">
+                      {COPY_STRATEGIES.map((s) => (
+                        <SelectItem key={s.id} value={s.id} className="focus:bg-amber-500/10 focus:text-amber-400 cursor-pointer py-3 rounded-lg mx-2 my-1">
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Gatilho Primário</Label>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <div className="w-4 h-4 rounded-full border border-white/10 flex items-center justify-center cursor-help transition-colors hover:border-amber-500/50">
+                          <span className="text-[8px] font-bold text-neutral-600">?</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-[#1A1A1C] border-white/10 text-neutral-300 max-w-[200px]">
+                        <p>O conceito psicológico que será a base da persuasão nesta peça.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Select 
+                    value={formData.mentalTrigger} 
+                    onValueChange={(val) => setFormData({...formData, mentalTrigger: val})}
+                  >
+                    <SelectTrigger className="w-full bg-[#141416]/50 border-white/5 rounded-2xl h-14 px-6 text-neutral-200 focus:ring-amber-500/20 transition-all text-left font-medium hover:bg-[#141416] border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#1A1A1C] border-white/10 text-neutral-200">
+                      {MENTAL_TRIGGERS.map((trigger) => (
+                        <SelectItem key={trigger} value={trigger} className="focus:bg-amber-500/10 focus:text-amber-400 cursor-pointer py-3 rounded-lg mx-2 my-1 text-left">
+                          {trigger}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="pt-8">
+                  <Button 
+                    className="w-full h-16 bg-gradient-to-r from-amber-600 to-amber-400 hover:from-amber-500 hover:to-amber-300 text-black font-black uppercase tracking-[0.1em] sm:tracking-[0.2em] text-[12px] shadow-2xl shadow-amber-600/20 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] border-none px-4 group/btn relative overflow-hidden" 
+                    id="generate-btn"
+                    onClick={handleGenerate}
+                    disabled={loading}
+                  >
+                    <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-1000 ease-in-out skew-x-12" />
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                        <span>Engenhando...</span>
+                      </>
+                    ) : (
+                      <span className="truncate relative z-10">Gerar Copy de Alta Performance</span>
+                    )}
+                  </Button>
+                </div>
+
+                {history.length > 0 && (
+                  <div className="pt-10 border-t border-white/5 space-y-6">
+                    <div className="flex items-center justify-between px-1">
+                      <h3 className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 font-bold">REPROCESSADOS RECENTES</h3>
+                      <button onClick={clearHistory} className="text-[9px] text-neutral-700 hover:text-red-900 font-black uppercase transition-colors tracking-widest">
+                        LIMPAR
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {history.map((content, idx) => (
+                        <div 
+                          key={idx} 
+                          onClick={() => setGeneratedCopy(content)}
+                          className="p-4 bg-[#141416]/30 border border-white/5 rounded-xl cursor-pointer hover:bg-amber-500/5 hover:border-amber-500/20 transition-all group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-neutral-900 border border-white/5 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                              <FileText className="w-4 h-4 text-neutral-600 group-hover:text-amber-500" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] text-neutral-400 font-medium truncate leading-tight">
+                                {content.split('\n')[0].replace(/[#*]/g, '').trim() || "Cópia Gerada #" + (history.length - idx)}
+                              </p>
+                              <p className="text-[9px] text-neutral-700 font-bold uppercase mt-0.5 tracking-tighter">
+                                Arquivo de Memória {idx + 1}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </Button>
-            </div>
-          </div>
-        </aside>
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
 
         {/* Content Area - Right */}
         <section className="flex-1 p-6 lg:p-12 bg-[#0A0A0B] flex flex-col min-h-screen lg:min-h-0 lg:overflow-hidden relative">
@@ -299,10 +473,31 @@ export default function App() {
           
           <div className="h-full flex flex-col z-10">
             <div className="flex items-center justify-between mb-8 lg:mb-10">
-              <div>
-                <p className="text-[10px] text-amber-500/60 uppercase tracking-[0.4em] mb-1 px-1 font-bold">Prancheta</p>
-                <h2 className="text-2xl lg:text-3xl font-bold text-white tracking-tight uppercase">Arquitetura da <span className="opacity-40">Página</span></h2>
+              <div className="flex items-center gap-6">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  className="rounded-xl border border-white/5 bg-white/5 hover:bg-amber-500/10 hover:text-amber-500 transition-all hidden lg:flex h-12 w-12"
+                  title={isSidebarOpen ? "Recolher Arquiteto" : "Expandir Arquiteto"}
+                >
+                  {isSidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+                </Button>
+                <div>
+                  <p className="text-[10px] text-amber-500/60 uppercase tracking-[0.4em] mb-1 px-1 font-bold">Prancheta</p>
+                  <h2 className="text-2xl lg:text-3xl font-bold text-white tracking-tight uppercase">Arquitetura da <span className="opacity-40">Página</span></h2>
+                </div>
               </div>
+              
+              {/* Mobile toggle button */}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="lg:hidden rounded-lg border border-white/5 bg-white/5 text-[10px] font-bold uppercase tracking-widest px-4 h-10"
+              >
+                {isSidebarOpen ? "Ocultar Dados" : "Ver Dados"}
+              </Button>
             </div>
 
             <div className="mt-0 flex-1 lg:overflow-hidden" id="copy-result">
@@ -377,5 +572,6 @@ export default function App() {
         </section>
       </main>
     </div>
+    </TooltipProvider>
   );
 }

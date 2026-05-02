@@ -26,9 +26,31 @@ const getSupabaseConfig = () => {
   return { url: finalUrl, key };
 };
 
-const { url: supabaseUrl, key: supabaseAnonKey } = getSupabaseConfig();
+let supabase: any;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+try {
+  const { url: supabaseUrl, key: supabaseAnonKey } = getSupabaseConfig();
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
+} catch (error) {
+  console.error("Failed to initialize Supabase client:", error);
+  // Create a mock object so it doesn't crash everything
+  supabase = {
+    from: () => ({
+      select: () => ({
+        order: () => ({
+          limit: () => Promise.resolve({ data: [], error: null })
+        }),
+        insert: () => Promise.resolve({ data: null, error: new Error("Supabase not initialized") }),
+        delete: () => ({
+          neq: () => Promise.resolve({ error: new Error("Supabase not initialized") })
+        })
+      })
+    }),
+    auth: {}
+  };
+}
+
+export { supabase };
 
 /**
  * Interface para o histórico de copies no Supabase
