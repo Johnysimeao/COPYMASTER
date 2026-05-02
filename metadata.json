@@ -1,0 +1,6 @@
+{
+  "name": "Gerador de Copy Presell",
+  "description": "Gerador inteligente de copys para páginas presell baseado em modelos de alta conversão e gatilhos mentais.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["AI Content Generation", "Copywriting Automation"]
+}
