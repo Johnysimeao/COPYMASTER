@@ -6,6 +6,7 @@ import {
   Copy, 
   Loader2, 
   Check,
+  X,
   Printer,
   ChevronLeft,
   ChevronRight,
@@ -34,7 +35,7 @@ import {
 
 import { generateCopy, CopyInput } from "@/src/lib/gemini";
 import { COPY_STRATEGIES, MENTAL_TRIGGERS } from "@/src/lib/templates";
-import { supabase } from "@/src/lib/supabase";
+import { storage, ReferenceMaterial } from "@/src/lib/supabase";
 
 export default function App() {
   const [loading, setLoading] = useState(false);
@@ -42,6 +43,10 @@ export default function App() {
   const [history, setHistory] = useState<string[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [referenceMaterials, setReferenceMaterials] = useState<ReferenceMaterial[]>([]);
+  const [isLearning, setIsLearning] = useState(false);
+  const [newMaterial, setNewMaterial] = useState({ title: "", content: "", category: "Exemplo" });
+  const [activeTab, setActiveTab ] = useState("editor");
 
   // Handle window resizing
   useEffect(() => {
@@ -53,33 +58,20 @@ export default function App() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Load history from Supabase on mount
+  // Load data from Storage on mount
   useEffect(() => {
-    const fetchHistory = async () => {
+    const fetchData = async () => {
       try {
-        const { data, error } = await supabase
-          .from('copy_history')
-          .select('content')
-          .order('created_at', { ascending: false })
-          .limit(10);
+        const historyData = await storage.getHistory();
+        setHistory(historyData);
 
-        if (error) throw error;
-        if (data) {
-          setHistory(data.map(item => item.content));
-        }
+        const refData = await storage.getMaterials();
+        setReferenceMaterials(refData);
       } catch (e) {
-        console.error("Erro ao carregar histórico do Supabase:", e);
-        // Fallback to localStorage if Supabase fails (e.g. table not created yet)
-        const saved = localStorage.getItem("copy_history");
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) setHistory(parsed);
-          } catch {}
-        }
+        console.warn("Storage fetch failed:", e);
       }
     };
-    fetchHistory();
+    fetchData();
   }, []);
 
   const [formData, setFormData] = useState<CopyInput>({
@@ -101,22 +93,15 @@ export default function App() {
 
     setLoading(true);
     try {
-      const result = await generateCopy(formData);
+      const result = await generateCopy(formData, referenceMaterials);
       if (result) {
         setGeneratedCopy(result);
         
-        // Save to Supabase
-        try {
-          await supabase.from('copy_history').insert([
-            { content: result, metadata: formData }
-          ]);
-        } catch (dbError) {
-          console.error("Erro ao salvar no banco:", dbError);
-        }
+        // Save to Storage
+        await storage.saveHistory(result, formData);
 
         const newHistory = [result, ...history].slice(0, 10);
         setHistory(newHistory);
-        localStorage.setItem("copy_history", JSON.stringify(newHistory));
         toast.success("Estratégia calculada!");
       }
     } catch (error) {
@@ -131,17 +116,43 @@ export default function App() {
     toast.success("Copiado!");
   };
 
+  const handleAddMaterial = async () => {
+    if (!newMaterial.title || !newMaterial.content) {
+      toast.error("Preencha título e conteúdo do material.");
+      return;
+    }
+
+    setIsLearning(true);
+    try {
+      const data = await storage.addMaterial(newMaterial);
+      setReferenceMaterials([data, ...referenceMaterials]);
+      setNewMaterial({ title: "", content: "", category: "Exemplo" });
+      toast.success("Conhecimento absorvido!");
+    } catch (e) {
+      toast.error("Erro ao salvar material.");
+    } finally {
+      setIsLearning(false);
+    }
+  };
+
+  const handleDeleteMaterial = async (id: string) => {
+    try {
+      await storage.deleteMaterial(id);
+      setReferenceMaterials(referenceMaterials.filter(m => m.id !== id));
+      toast.info("Material removido.");
+    } catch (e) {
+      toast.error("Erro ao remover material.");
+    }
+  };
+
   const clearHistory = async () => {
     try {
-      // Note: This requires a policy to allow deletion
-      const { error } = await supabase.from('copy_history').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      if (error) throw error;
+      await storage.clearHistory();
     } catch (e) {
-      console.error("Erro ao limpar histórico no banco:", e);
+      console.error("Erro ao limpar histórico:", e);
     }
     
     setHistory([]);
-    localStorage.removeItem("copy_history");
     toast.info("Histórico limpo.");
   };
 
@@ -489,6 +500,13 @@ export default function App() {
                 </div>
               </div>
               
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="bg-white/5 p-1 rounded-xl border border-white/5 hidden sm:flex">
+                <TabsList className="bg-transparent border-none p-0 h-10 gap-1">
+                  <TabsTrigger value="editor" className="rounded-lg px-6 data-[state=active]:bg-amber-500 data-[state=active]:text-black text-[10px] font-bold uppercase tracking-widest transition-all">Editor</TabsTrigger>
+                  <TabsTrigger value="knowledge" className="rounded-lg px-6 data-[state=active]:bg-amber-500 data-[state=active]:text-black text-[10px] font-bold uppercase tracking-widest transition-all">Cérebro</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
               {/* Mobile toggle button */}
               <Button 
                 variant="ghost" 
@@ -502,67 +520,177 @@ export default function App() {
 
             <div className="mt-0 flex-1 lg:overflow-hidden" id="copy-result">
               <AnimatePresence mode="wait">
-                {generatedCopy ? (
-                  <motion.div
-                    key="copy-content"
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 1.02 }}
-                    className="h-full flex flex-col gap-8"
-                  >
-                    <div className="flex-1 bg-white/[0.015] border border-white/5 rounded-3xl relative overflow-hidden group shadow-2xl backdrop-blur-sm">
-                      <div className="absolute top-0 right-0 p-6 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-                        <Button variant="secondary" size="sm" className="bg-white/10 border-white/5 hover:bg-amber-500 hover:text-black rounded-lg text-[10px] font-black tracking-widest uppercase h-9" onClick={() => copyToClipboard(generatedCopy)}>
-                          <Copy className="w-3 h-3 mr-2" />
-                          COPIAR
+                {activeTab === "editor" ? (
+                  generatedCopy ? (
+                    <motion.div
+                      key="copy-content"
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 1.02 }}
+                      className="h-full flex flex-col gap-8"
+                    >
+                      <div className="flex-1 bg-white/[0.015] border border-white/5 rounded-3xl relative overflow-hidden group shadow-2xl backdrop-blur-sm">
+                        <div className="absolute top-0 right-0 p-6 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
+                          <Button variant="secondary" size="sm" className="bg-white/10 border-white/5 hover:bg-amber-500 hover:text-black rounded-lg text-[10px] font-black tracking-widest uppercase h-9" onClick={() => copyToClipboard(generatedCopy)}>
+                            <Copy className="w-3 h-3 mr-2" />
+                            COPIAR
+                          </Button>
+                        </div>
+                        
+                        <ScrollArea className="h-full p-10 md:p-16 custom-scrollbar">
+                          <div className="max-w-2xl mx-auto py-4">
+                            <div className="markdown-body">
+                              <ReactMarkdown>{generatedCopy}</ReactMarkdown>
+                            </div>
+                          </div>
+                        </ScrollArea>
+                        
+                        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#0A0A0B] to-transparent pointer-events-none" />
+                      </div>
+
+                      <div className="flex gap-4 pb-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <Button variant="outline" className="rounded-xl border-white/5 bg-white/5 hover:bg-white/10 h-12 px-8 text-[10px] font-bold uppercase tracking-widest transition-all" onClick={() => copyToClipboard(generatedCopy)}>
+                          <Copy className="w-4 h-4 mr-3 text-amber-500" />
+                          Copiar Conteúdo
+                        </Button>
+                        <Button variant="outline" className="rounded-xl border-white/5 bg-white/5 hover:bg-white/10 h-12 px-8 text-[10px] font-bold uppercase tracking-widest transition-all" onClick={() => window.print()}>
+                          <Printer className="w-4 h-4 mr-3 text-amber-500" />
+                          Salvar PDF
                         </Button>
                       </div>
-                      
-                      <ScrollArea className="h-full p-10 md:p-16 custom-scrollbar">
-                        <div className="max-w-2xl mx-auto py-4">
-                          <div className="markdown-body">
-                            <ReactMarkdown>{generatedCopy}</ReactMarkdown>
-                          </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="no-copy"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="h-full flex flex-col items-center justify-center text-center space-y-8"
+                    >
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-amber-500/10 blur-[100px] rounded-full animate-pulse" />
+                        <div className="relative w-32 h-32 bg-white/[0.02] rounded-[40px] border border-white/5 flex items-center justify-center rotate-6 shadow-2xl">
+                          <FileText className="w-12 h-12 text-amber-500/20" />
                         </div>
-                      </ScrollArea>
-                      
-                      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#0A0A0B] to-transparent pointer-events-none" />
-                    </div>
-
-                    <div className="flex gap-4 pb-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                      <Button variant="outline" className="rounded-xl border-white/5 bg-white/5 hover:bg-white/10 h-12 px-8 text-[10px] font-bold uppercase tracking-widest transition-all" onClick={() => copyToClipboard(generatedCopy)}>
-                        <Copy className="w-4 h-4 mr-3 text-amber-500" />
-                        Copiar Conteúdo
-                      </Button>
-                      <Button variant="outline" className="rounded-xl border-white/5 bg-white/5 hover:bg-white/10 h-12 px-8 text-[10px] font-bold uppercase tracking-widest transition-all" onClick={() => window.print()}>
-                        <Printer className="w-4 h-4 mr-3 text-amber-500" />
-                        Salvar PDF
-                      </Button>
-                    </div>
-                  </motion.div>
+                        <motion.div 
+                          animate={{ scale: [1, 1.1, 1] }} 
+                          transition={{ repeat: Infinity, duration: 4 }}
+                          className="absolute -top-3 -right-3 w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center text-black shadow-xl"
+                        >
+                          <Check className="w-6 h-6" strokeWidth={3} />
+                        </motion.div>
+                      </div>
+                      <div className="space-y-3 max-w-sm">
+                        <h2 className="text-2xl font-bold text-white tracking-tight uppercase">O palco está pronto.</h2>
+                        <p className="text-neutral-500 text-sm leading-relaxed font-medium">Preencha os dados técnicos à esquerda para iniciar o processamento da sua copy de alta performance.</p>
+                      </div>
+                    </motion.div>
+                  )
                 ) : (
                   <motion.div
-                    key="no-copy"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="h-full flex flex-col items-center justify-center text-center space-y-8"
+                    key="knowledge-base"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="h-full flex flex-col gap-8"
                   >
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-amber-500/10 blur-[100px] rounded-full animate-pulse" />
-                      <div className="relative w-32 h-32 bg-white/[0.02] rounded-[40px] border border-white/5 flex items-center justify-center rotate-6 shadow-2xl">
-                        <FileText className="w-12 h-12 text-amber-500/20" />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 flex-1 min-h-0">
+                      {/* Form side */}
+                      <Card className="bg-white/[0.02] border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+                        <CardHeader className="p-8 pb-4">
+                          <CardTitle className="text-white text-lg tracking-wider uppercase font-black">Adicionar Estudo</CardTitle>
+                          <CardDescription className="text-neutral-500 text-xs uppercase tracking-widest font-bold">Alimente o cérebro do Titan-G3</CardDescription>
+                        </CardHeader>
+                        <CardContent className="px-8 pb-8 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
+                           <div className="space-y-2">
+                              <Label className="text-[10px] text-neutral-600 uppercase font-bold tracking-widest">Título do Material</Label>
+                              <Input 
+                                className="bg-[#0A0A0B]/50 border-white/5 rounded-xl text-neutral-300"
+                                placeholder="Ex: Modelo de Anúncio VSL"
+                                value={newMaterial.title}
+                                onChange={(e) => setNewMaterial({...newMaterial, title: e.target.value})}
+                              />
+                           </div>
+                           <div className="space-y-2">
+                              <Label className="text-[10px] text-neutral-600 uppercase font-bold tracking-widest">Categoria</Label>
+                              <Select value={newMaterial.category} onValueChange={(val) => setNewMaterial({...newMaterial, category: val})}>
+                                <SelectTrigger className="bg-[#0A0A0B]/50 border-white/5 rounded-xl text-neutral-300">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-[#1A1A1C] border-white/10 text-neutral-300">
+                                  <SelectItem value="Exemplo">Exemplo de Copy</SelectItem>
+                                  <SelectItem value="Framework">Framework / Estrutura</SelectItem>
+                                  <SelectItem value="Estudo">Material de Estudo</SelectItem>
+                                  <SelectItem value="Outros">Outros</SelectItem>
+                                </SelectContent>
+                              </Select>
+                           </div>
+                           <div className="space-y-2 flex-1 flex flex-col">
+                              <Label className="text-[10px] text-neutral-600 uppercase font-bold tracking-widest">Conteúdo / Texto</Label>
+                              <Textarea 
+                                className="bg-[#0A0A0B]/50 border-white/5 rounded-xl text-neutral-300 flex-1 min-h-[150px] resize-none"
+                                placeholder="Cole aqui o texto do material de estudo..."
+                                value={newMaterial.content}
+                                onChange={(e) => setNewMaterial({...newMaterial, content: e.target.value})}
+                              />
+                           </div>
+                        </CardContent>
+                        <CardFooter className="p-8 pt-0">
+                          <Button 
+                            className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest text-[10px] h-12 rounded-xl"
+                            onClick={handleAddMaterial}
+                            disabled={isLearning}
+                          >
+                            {isLearning ? <Loader2 className="w-4 h-4 animate-spin" /> : "Fixar Conhecimento"}
+                          </Button>
+                        </CardFooter>
+                      </Card>
+
+                      {/* List side */}
+                      <div className="md:col-span-2 flex flex-col gap-6 overflow-hidden">
+                        <div className="flex items-center justify-between px-2">
+                           <h3 className="text-[10px] text-neutral-500 uppercase font-bold tracking-[0.3em]">Materiais Aspirados ({referenceMaterials.length})</h3>
+                        </div>
+                        <ScrollArea className="flex-1 rounded-3xl pr-4">
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-10">
+                              {referenceMaterials.length > 0 ? (
+                                referenceMaterials.map((material) => (
+                                  <Card key={material.id} className="bg-white/[0.015] border-white/5 hover:border-amber-500/20 transition-all rounded-2xl group flex flex-col">
+                                    <CardHeader className="p-5 flex-row items-center justify-between space-y-0">
+                                      <div className="space-y-1">
+                                        <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 text-[8px] font-black uppercase border-none px-2 rounded-lg">{material.category}</Badge>
+                                        <CardTitle className="text-white text-[13px] font-bold truncate pr-2">{material.title}</CardTitle>
+                                      </div>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-8 w-8 text-neutral-700 hover:text-red-500 transition-colors"
+                                        onClick={() => handleDeleteMaterial(material.id)}
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </Button>
+                                    </CardHeader>
+                                    <CardContent className="p-5 pt-0 flex-1">
+                                      <p className="text-[11px] text-neutral-500 line-clamp-3 leading-relaxed">
+                                        {material.content}
+                                      </p>
+                                    </CardContent>
+                                    <CardFooter className="p-5 pt-0 border-t border-white/[0.02] flex justify-between items-center bg-white/[0.005]">
+                                      <span className="text-[9px] text-neutral-700 font-mono italic">
+                                        {new Date(material.created_at).toLocaleDateString()}
+                                      </span>
+                                      <Button variant="ghost" size="sm" className="h-6 text-[9px] font-bold text-neutral-600 hover:text-amber-500 uppercase p-0">Ver Detalhes</Button>
+                                    </CardFooter>
+                                  </Card>
+                                ))
+                              ) : (
+                                <div className="col-span-full h-64 border-2 border-dashed border-white/5 rounded-3xl flex flex-col items-center justify-center text-neutral-700 space-y-3">
+                                  <Zap className="w-10 h-10 opacity-20" />
+                                  <p className="text-xs uppercase font-bold tracking-widest text-neutral-800">O cérebro está vazio</p>
+                                </div>
+                              )}
+                           </div>
+                        </ScrollArea>
                       </div>
-                      <motion.div 
-                        animate={{ scale: [1, 1.1, 1] }} 
-                        transition={{ repeat: Infinity, duration: 4 }}
-                        className="absolute -top-3 -right-3 w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center text-black shadow-xl"
-                      >
-                        <Check className="w-6 h-6" strokeWidth={3} />
-                      </motion.div>
-                    </div>
-                    <div className="space-y-3 max-w-sm">
-                      <h2 className="text-2xl font-bold text-white tracking-tight uppercase">O palco está pronto.</h2>
-                      <p className="text-neutral-500 text-sm leading-relaxed font-medium">Preencha os dados técnicos à esquerda para iniciar o processamento da sua copy de alta performance.</p>
                     </div>
                   </motion.div>
                 )}
