@@ -68,7 +68,7 @@ export default function App() {
         const refData = await storage.getMaterials();
         setReferenceMaterials(refData);
       } catch (e) {
-        console.warn("Storage fetch failed:", e);
+        console.warn("Falha ao carregar banco local:", e);
       }
     };
     fetchData();
@@ -85,6 +85,20 @@ export default function App() {
     mentalTrigger: MENTAL_TRIGGERS[0],
   });
 
+  const resetForm = () => {
+    setFormData({
+      productName: "",
+      niche: "",
+      targetAudience: "",
+      mainBenefit: "",
+      mainPain: "",
+      keywords: "",
+      strategyId: "bridge_presell",
+      mentalTrigger: MENTAL_TRIGGERS[0],
+    });
+    toast.info("Formulário resetado.");
+  };
+
   const handleGenerate = async () => {
     if (!formData.productName || !formData.mainBenefit || !formData.mainPain) {
       toast.error("Por favor, preencha os campos obrigatórios.");
@@ -96,16 +110,13 @@ export default function App() {
       const result = await generateCopy(formData, referenceMaterials);
       if (result) {
         setGeneratedCopy(result);
-        
-        // Save to Storage
         await storage.saveHistory(result, formData);
-
         const newHistory = [result, ...history].slice(0, 10);
         setHistory(newHistory);
-        toast.success("Estratégia calculada!");
+        toast.success("Elite Copy gerada com sucesso!");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Erro desconhecido");
+      toast.error("Ocorreu um problema na geração. Verifique os dados.");
     } finally {
       setLoading(false);
     }
@@ -329,7 +340,7 @@ export default function App() {
                   <Input 
                     id="mainPain" 
                     className="bg-[#141416]/50 border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 font-medium text-base hover:bg-[#141416] border"
-                    placeholder="Ex: Bloqueios constants no Facebook" 
+                    placeholder="Ex: Bloqueios constantes no Facebook" 
                     value={formData.mainPain}
                     onChange={(e) => setFormData({...formData, mainPain: e.target.value})}
                   />
@@ -421,9 +432,17 @@ export default function App() {
                   </Select>
                 </div>
 
-                <div className="pt-8">
+                <div className="pt-8 flex gap-3">
                   <Button 
-                    className="w-full h-16 bg-gradient-to-r from-amber-600 to-amber-400 hover:from-amber-500 hover:to-amber-300 text-black font-black uppercase tracking-[0.1em] sm:tracking-[0.2em] text-[12px] shadow-2xl shadow-amber-600/20 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] border-none px-4 group/btn relative overflow-hidden" 
+                    variant="outline"
+                    className="flex-none w-16 h-16 border-white/5 bg-white/5 hover:bg-white/10 text-neutral-500 hover:text-red-500 rounded-2xl transition-all"
+                    onClick={resetForm}
+                    title="Limpar todos os campos"
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                  <Button 
+                    className="flex-1 h-16 bg-gradient-to-r from-amber-600 to-amber-400 hover:from-amber-500 hover:to-amber-300 text-black font-black uppercase tracking-[0.1em] sm:tracking-[0.2em] text-[12px] shadow-2xl shadow-amber-600/20 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] border-none px-4 group/btn relative overflow-hidden" 
                     id="generate-btn"
                     onClick={handleGenerate}
                     disabled={loading}
@@ -503,7 +522,6 @@ export default function App() {
               <Tabs value={activeTab} onValueChange={setActiveTab} className="bg-white/5 p-1 rounded-xl border border-white/5 hidden sm:flex">
                 <TabsList className="bg-transparent border-none p-0 h-10 gap-1">
                   <TabsTrigger value="editor" className="rounded-lg px-6 data-[state=active]:bg-amber-500 data-[state=active]:text-black text-[10px] font-bold uppercase tracking-widest transition-all">Editor</TabsTrigger>
-                  <TabsTrigger value="knowledge" className="rounded-lg px-6 data-[state=active]:bg-amber-500 data-[state=active]:text-black text-[10px] font-bold uppercase tracking-widest transition-all">Cérebro</TabsTrigger>
                 </TabsList>
               </Tabs>
 
@@ -520,8 +538,7 @@ export default function App() {
 
             <div className="mt-0 flex-1 lg:overflow-hidden" id="copy-result">
               <AnimatePresence mode="wait">
-                {activeTab === "editor" ? (
-                  generatedCopy ? (
+                {generatedCopy ? (
                     <motion.div
                       key="copy-content"
                       initial={{ opacity: 0, scale: 0.98 }}
@@ -585,115 +602,7 @@ export default function App() {
                       </div>
                     </motion.div>
                   )
-                ) : (
-                  <motion.div
-                    key="knowledge-base"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="h-full flex flex-col gap-8"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 flex-1 min-h-0">
-                      {/* Form side */}
-                      <Card className="bg-white/[0.02] border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
-                        <CardHeader className="p-8 pb-4">
-                          <CardTitle className="text-white text-lg tracking-wider uppercase font-black">Adicionar Estudo</CardTitle>
-                          <CardDescription className="text-neutral-500 text-xs uppercase tracking-widest font-bold">Alimente o cérebro do Titan-G3</CardDescription>
-                        </CardHeader>
-                        <CardContent className="px-8 pb-8 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
-                           <div className="space-y-2">
-                              <Label className="text-[10px] text-neutral-600 uppercase font-bold tracking-widest">Título do Material</Label>
-                              <Input 
-                                className="bg-[#0A0A0B]/50 border-white/5 rounded-xl text-neutral-300"
-                                placeholder="Ex: Modelo de Anúncio VSL"
-                                value={newMaterial.title}
-                                onChange={(e) => setNewMaterial({...newMaterial, title: e.target.value})}
-                              />
-                           </div>
-                           <div className="space-y-2">
-                              <Label className="text-[10px] text-neutral-600 uppercase font-bold tracking-widest">Categoria</Label>
-                              <Select value={newMaterial.category} onValueChange={(val) => setNewMaterial({...newMaterial, category: val})}>
-                                <SelectTrigger className="bg-[#0A0A0B]/50 border-white/5 rounded-xl text-neutral-300">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="bg-[#1A1A1C] border-white/10 text-neutral-300">
-                                  <SelectItem value="Exemplo">Exemplo de Copy</SelectItem>
-                                  <SelectItem value="Framework">Framework / Estrutura</SelectItem>
-                                  <SelectItem value="Estudo">Material de Estudo</SelectItem>
-                                  <SelectItem value="Outros">Outros</SelectItem>
-                                </SelectContent>
-                              </Select>
-                           </div>
-                           <div className="space-y-2 flex-1 flex flex-col">
-                              <Label className="text-[10px] text-neutral-600 uppercase font-bold tracking-widest">Conteúdo / Texto</Label>
-                              <Textarea 
-                                className="bg-[#0A0A0B]/50 border-white/5 rounded-xl text-neutral-300 flex-1 min-h-[150px] resize-none"
-                                placeholder="Cole aqui o texto do material de estudo..."
-                                value={newMaterial.content}
-                                onChange={(e) => setNewMaterial({...newMaterial, content: e.target.value})}
-                              />
-                           </div>
-                        </CardContent>
-                        <CardFooter className="p-8 pt-0">
-                          <Button 
-                            className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest text-[10px] h-12 rounded-xl"
-                            onClick={handleAddMaterial}
-                            disabled={isLearning}
-                          >
-                            {isLearning ? <Loader2 className="w-4 h-4 animate-spin" /> : "Fixar Conhecimento"}
-                          </Button>
-                        </CardFooter>
-                      </Card>
-
-                      {/* List side */}
-                      <div className="md:col-span-2 flex flex-col gap-6 overflow-hidden">
-                        <div className="flex items-center justify-between px-2">
-                           <h3 className="text-[10px] text-neutral-500 uppercase font-bold tracking-[0.3em]">Materiais Aspirados ({referenceMaterials.length})</h3>
-                        </div>
-                        <ScrollArea className="flex-1 rounded-3xl pr-4">
-                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-10">
-                              {referenceMaterials.length > 0 ? (
-                                referenceMaterials.map((material) => (
-                                  <Card key={material.id} className="bg-white/[0.015] border-white/5 hover:border-amber-500/20 transition-all rounded-2xl group flex flex-col">
-                                    <CardHeader className="p-5 flex-row items-center justify-between space-y-0">
-                                      <div className="space-y-1">
-                                        <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 text-[8px] font-black uppercase border-none px-2 rounded-lg">{material.category}</Badge>
-                                        <CardTitle className="text-white text-[13px] font-bold truncate pr-2">{material.title}</CardTitle>
-                                      </div>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-8 w-8 text-neutral-700 hover:text-red-500 transition-colors"
-                                        onClick={() => handleDeleteMaterial(material.id)}
-                                      >
-                                        <X className="w-4 h-4" />
-                                      </Button>
-                                    </CardHeader>
-                                    <CardContent className="p-5 pt-0 flex-1">
-                                      <p className="text-[11px] text-neutral-500 line-clamp-3 leading-relaxed">
-                                        {material.content}
-                                      </p>
-                                    </CardContent>
-                                    <CardFooter className="p-5 pt-0 border-t border-white/[0.02] flex justify-between items-center bg-white/[0.005]">
-                                      <span className="text-[9px] text-neutral-700 font-mono italic">
-                                        {new Date(material.created_at).toLocaleDateString()}
-                                      </span>
-                                      <Button variant="ghost" size="sm" className="h-6 text-[9px] font-bold text-neutral-600 hover:text-amber-500 uppercase p-0">Ver Detalhes</Button>
-                                    </CardFooter>
-                                  </Card>
-                                ))
-                              ) : (
-                                <div className="col-span-full h-64 border-2 border-dashed border-white/5 rounded-3xl flex flex-col items-center justify-center text-neutral-700 space-y-3">
-                                  <Zap className="w-10 h-10 opacity-20" />
-                                  <p className="text-xs uppercase font-bold tracking-widest text-neutral-800">O cérebro está vazio</p>
-                                </div>
-                              )}
-                           </div>
-                        </ScrollArea>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
+                }
               </AnimatePresence>
             </div>
           </div>
