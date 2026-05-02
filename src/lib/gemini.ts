@@ -1,7 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
 import { SYSTEM_PROMPT } from "./templates";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let genAI: GoogleGenAI | null = null;
+
+function getAI() {
+  if (!genAI) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey === "undefined") {
+      throw new Error("Chave de API do Gemini não configurada.");
+    }
+    genAI = new GoogleGenAI({ apiKey });
+  }
+  return genAI;
+}
 
 export interface CopyInput {
   productName: string;
@@ -16,6 +27,7 @@ export interface CopyInput {
 
 export async function generateCopy(input: CopyInput) {
   const model = "gemini-3-flash-preview";
+  const ai = getAI();
   
   const userPrompt = `
 Gere uma copy profissional de alta performance com os seguintes parâmetros:
@@ -41,9 +53,16 @@ A copy deve seguir exatamente o modelo de escrita solicitado, focando em máxima
       },
     });
 
-    return response.text;
+    const text = response.text;
+    if (!text) {
+      throw new Error("O modelo não retornou nenhum texto.");
+    }
+    return text;
   } catch (error) {
     console.error("Erro ao gerar copy:", error);
+    if (error instanceof Error) {
+      throw error;
+    }
     throw new Error("Falha na geração da copy. Verifique sua conexão ou chave de API.");
   }
 }

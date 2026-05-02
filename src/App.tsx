@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Zap, 
@@ -24,14 +24,41 @@ import { Separator } from "@/components/ui/separator";
 
 import { generateCopy, CopyInput } from "@/src/lib/gemini";
 import { COPY_STRATEGIES, MENTAL_TRIGGERS } from "@/src/lib/templates";
+import { supabase } from "@/src/lib/supabase";
 
 export default function App() {
   const [loading, setLoading] = useState(false);
   const [generatedCopy, setGeneratedCopy] = useState<string>("");
-  const [history, setHistory] = useState<string[]>(() => {
-    const saved = localStorage.getItem("copy_history");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [history, setHistory] = useState<string[]>([]);
+
+  // Load history from Supabase on mount
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('copy_history')
+          .select('content')
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (error) throw error;
+        if (data) {
+          setHistory(data.map(item => item.content));
+        }
+      } catch (e) {
+        console.error("Erro ao carregar histórico do Supabase:", e);
+        // Fallback to localStorage if Supabase fails (e.g. table not created yet)
+        const saved = localStorage.getItem("copy_history");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) setHistory(parsed);
+          } catch {}
+        }
+      }
+    };
+    fetchHistory();
+  }, []);
 
   const [formData, setFormData] = useState<CopyInput>({
     productName: "",
@@ -40,7 +67,7 @@ export default function App() {
     mainBenefit: "",
     mainPain: "",
     keywords: "",
-    strategyId: "bridge_vsl",
+    strategyId: "bridge_presell",
     mentalTrigger: MENTAL_TRIGGERS[0],
   });
 
@@ -55,6 +82,16 @@ export default function App() {
       const result = await generateCopy(formData);
       if (result) {
         setGeneratedCopy(result);
+        
+        // Save to Supabase
+        try {
+          await supabase.from('copy_history').insert([
+            { content: result, metadata: formData }
+          ]);
+        } catch (dbError) {
+          console.error("Erro ao salvar no banco:", dbError);
+        }
+
         const newHistory = [result, ...history].slice(0, 10);
         setHistory(newHistory);
         localStorage.setItem("copy_history", JSON.stringify(newHistory));
@@ -72,14 +109,22 @@ export default function App() {
     toast.success("Copiado!");
   };
 
-  const clearHistory = () => {
+  const clearHistory = async () => {
+    try {
+      // Note: This requires a policy to allow deletion
+      const { error } = await supabase.from('copy_history').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error) throw error;
+    } catch (e) {
+      console.error("Erro ao limpar histórico no banco:", e);
+    }
+    
     setHistory([]);
     localStorage.removeItem("copy_history");
     toast.info("Histórico limpo.");
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-neutral-300 font-sans flex flex-col selection:bg-amber-500/30 selection:text-amber-200 uppercase-none" id="app-container">
+    <div className="min-h-screen bg-[#0A0A0B] text-neutral-300 font-sans flex flex-col selection:bg-amber-500/30 selection:text-amber-200 normal-case" id="app-container">
       <Toaster position="top-center" theme="dark" richColors />
       
       {/* Header */}
@@ -161,7 +206,7 @@ export default function App() {
               <Label htmlFor="mainBenefit" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Promessa Central *</Label>
               <Input 
                 id="mainBenefit" 
-                className="bg-[#141416] border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 font-medium text-base h-14"
+                className="bg-[#141416] border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 font-medium text-base"
                 placeholder="Ex: Venda sem investir 1 real" 
                 value={formData.mainBenefit}
                 onChange={(e) => setFormData({...formData, mainBenefit: e.target.value})}
@@ -172,7 +217,7 @@ export default function App() {
               <Label htmlFor="mainPain" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Problema Crítico *</Label>
               <Input 
                 id="mainPain" 
-                className="bg-[#141416] border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 font-medium text-base h-14"
+                className="bg-[#141416] border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 font-medium text-base"
                 placeholder="Ex: Bloqueios constants no Facebook" 
                 value={formData.mainPain}
                 onChange={(e) => setFormData({...formData, mainPain: e.target.value})}
@@ -183,7 +228,7 @@ export default function App() {
               <Label htmlFor="keywords" className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold ml-1">Palavras de Impacto</Label>
               <Input 
                 id="keywords" 
-                className="bg-[#141416] border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800 h-14"
+                className="bg-[#141416] border-white/5 rounded-2xl h-14 px-6 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/30 text-neutral-200 transition-all placeholder:text-neutral-800"
                 placeholder="Ex: bizarro, hack, revelado" 
                 value={formData.keywords}
                 onChange={(e) => setFormData({...formData, keywords: e.target.value})}
@@ -255,7 +300,7 @@ export default function App() {
           <div className="h-full flex flex-col z-10">
             <div className="flex items-center justify-between mb-8 lg:mb-10">
               <div>
-                <p className="text-[10px] text-amber-500/60 uppercase tracking-[0.4em] font-black mb-1 px-1 font-bold">Prancheta</p>
+                <p className="text-[10px] text-amber-500/60 uppercase tracking-[0.4em] mb-1 px-1 font-bold">Prancheta</p>
                 <h2 className="text-2xl lg:text-3xl font-bold text-white tracking-tight uppercase">Arquitetura da <span className="opacity-40">Página</span></h2>
               </div>
             </div>
